@@ -1,0 +1,23 @@
+@inherits LayoutComponentBase
+@using Radzen.Blazor
+<RadzenComponents />
+<div class="auth-bg">
+    <div class="auth-card-lg">
+        @Body
+    </div>
+</div>
+<style>
+    .auth-bg {
+        background: linear-gradient(135deg, #fff5f0 0%, #ffe8dc 50%, #ffd4b8 100%) !important;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+    }
+
+    body {
+        margin: 0;
+        padding: 0;
+    }
+</style>

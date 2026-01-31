@@ -1,0 +1,256 @@
+@using PeopleApp.Client.Dtos.Purchases
+@using PeopleApp.Client.Dtos.Products
+@using Microsoft.AspNetCore.Components.Authorization
+
+@inject AuthenticationStateProvider AuthStateProvider
+
+@inject ProductsApiClient ProductsApi
+@inject PurchasesApiClient PurchasesApi
+@inject DialogService DialogService
+
+<EditForm Model="_model" OnValidSubmit="Save">
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+
+    <div class="row" style="gap: 12px;">
+        <div style="flex: 1;">
+            <RadzenLabel Text="Cliente" />
+            <RadzenTextBox Style="width:100%" @bind-Value="_model.CustomerName" Disabled="true" />
+
+            <RadzenRequiredValidator Component="CustomerName" Text="Cliente es requerido" />
+        </div>
+
+        <div style="width: 240px;">
+            <RadzenLabel Text="Fecha" />
+            <RadzenDatePicker Style="width:100%" @bind-Value="_model.Date" DateFormat="yyyy-MM-dd" />
+        </div>
+    </div>
+
+    <hr />
+
+    <h4>Detalle</h4>
+
+    <RadzenCard Style="margin-bottom: 12px;">
+        <div style="
+        display:grid;
+        grid-template-columns: 1.6fr 160px 1.4fr 240px;
+        gap:12px;
+        align-items:stretch;">
+
+            <div>
+                <RadzenLabel Text="Producto" />
+                <RadzenAutoComplete CssClass="input-std" Style="width:100%"
+                    Data="@_productSuggestions.Select(p => p.Name)" Placeholder="Escribe para buscar..."
+                    LoadData="@OnProductSearch" MinLength="2" @bind-Value="_productText"
+                    Change="@OnProductTextChanged" />
+            </div>
+
+            <div>
+                <RadzenLabel Text="Cantidad" />
+                <RadzenNumeric CssClass="input-std" Style="width:100%" @bind-Value="_draft.Quantity" Min="1" />
+            </div>
+
+            <div>
+                <RadzenLabel Text="Descripción" />
+                <RadzenTextBox CssClass="input-std" Style="width:100%" @bind-Value="_draft.Description" />
+            </div>
+
+            <div style="
+            display:flex;
+            gap:10px;
+            justify-content:flex-end;
+            align-items:flex-end;">
+
+                <RadzenButton CssClass="btn-std" Icon="add" Text="Agregar" ButtonStyle="ButtonStyle.Primary"
+                    Disabled="@(!_canAddLine)" Click="@AddLine" />
+
+                <RadzenButton CssClass="btn-std" Icon="close" Text="Limpiar" ButtonStyle="ButtonStyle.Light"
+                    Click="@ClearDraft" />
+            </div>
+        </div>
+    </RadzenCard>
+
+
+
+
+    <RadzenDataGrid EmptyText="Sin registros" @ref="_grid" Data="@_uiLines" TItem="UiLine" AllowPaging="false">
+        <Columns>
+            <RadzenDataGridColumn TItem="UiLine" Property="ProductName" Title="Producto" />
+            <RadzenDataGridColumn TItem="UiLine" Property="Quantity" Title="Cant." />
+            <RadzenDataGridColumn TItem="UiLine" Property="UnitPrice" Title="Precio" />
+            <RadzenDataGridColumn TItem="UiLine" Property="LineTotal" Title="Subtotal" />
+            <RadzenDataGridColumn TItem="UiLine" Property="Description" Title="Descripción" />
+            <RadzenDataGridColumn TItem="UiLine" Title="">
+                <Template Context="item">
+                    <RadzenButton Icon="delete" ButtonStyle="ButtonStyle.Danger" Size="ButtonSize.Small"
+                        Click="@(() => RemoveLineAsync(item))" />
+                </Template>
+            </RadzenDataGridColumn>
+        </Columns>
+    </RadzenDataGrid>
+
+    <div style="display:flex; justify-content:flex-end; margin-top: 12px;">
+        <b>Total: @_uiLines.Sum(x => x.LineTotal)</b>
+    </div>
+
+    <div style="margin-top: 16px; display:flex; gap: 10px; justify-content:flex-end;">
+        <RadzenButton Text="Guardar" ButtonStyle="ButtonStyle.Success" Type="submit"
+            Disabled="@(!_model.Lines.Any() || _isSaving)" />
+        <RadzenButton Text="Cerrar" ButtonStyle="ButtonStyle.Light" Click="@(() => DialogService.Close(null))" />
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(_error))
+    {
+        <RadzenAlert Style="margin-top:12px" Severity="AlertSeverity.Error" Summary="Error" Detail="@_error" />
+    }
+</EditForm>
+
+@code {
+    private PurchaseCreateDto _model = new() { Date = DateTime.Now };
+
+    private ProductSearchDto? _selectedProduct;
+    private List<ProductSearchDto> _productSuggestions = new();
+
+    private DraftLine _draft = new() { Quantity = 1 };
+    private List<UiLine> _uiLines = new();
+    private bool _isSaving = false;
+    private string? _error;
+
+    private string _productText = "";
+    private RadzenDataGrid<UiLine>? _grid;
+
+
+    private bool _canAddLine => _selectedProduct is not null && _draft.Quantity >= 1;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var state = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = state.User;
+
+        var first = user.Claims.FirstOrDefault(c => c.Type == "firstName")?.Value;
+        var last = user.Claims.FirstOrDefault(c => c.Type == "lastName")?.Value;
+
+        // fallback al email si por alguna razón no vienen
+        var email = user.Claims.FirstOrDefault(c => c.Type.EndsWith("/emailaddress"))?.Value;
+
+        var fullName = $"{first} {last}".Trim();
+        _model.CustomerName = string.IsNullOrWhiteSpace(fullName) ? (email ?? "Usuario") : fullName;
+    }
+
+
+
+
+    private async Task OnProductSearch(Radzen.LoadDataArgs args)
+    {
+        _productSuggestions = await ProductsApi.SearchAsync(args.Filter ?? "");
+    }
+
+
+    private void OnProductSelected(object? value)
+    {
+        _selectedProduct = value as ProductSearchDto;
+    }
+
+    private async Task AddLine()
+    {
+        if (_selectedProduct is null) return;
+
+        _uiLines.Add(new UiLine
+        {
+            ProductId = _selectedProduct.Id,
+            ProductName = _selectedProduct.Name,
+            UnitPrice = _selectedProduct.Price,
+            Quantity = _draft.Quantity,
+            Description = string.IsNullOrWhiteSpace(_draft.Description) ? null : _draft.Description.Trim()
+        });
+
+        _model.Lines.Add(new PurchaseLineCreateDto
+        {
+            ProductId = _selectedProduct.Id,
+            Quantity = _draft.Quantity,
+            Description = string.IsNullOrWhiteSpace(_draft.Description) ? null : _draft.Description.Trim()
+        });
+
+        await _grid?.Reload();
+
+        ClearDraft();
+    }
+
+
+    private void ClearDraft()
+    {
+        _selectedProduct = null;
+        _productText = "";
+        _draft = new DraftLine { Quantity = 1 };
+    }
+
+
+    private async Task RemoveLineAsync(UiLine item)
+    {
+        var index = _uiLines.IndexOf(item);
+        if (index < 0) return;
+
+        _uiLines.RemoveAt(index);
+        if (index < _model.Lines.Count) _model.Lines.RemoveAt(index);
+
+        if (_grid is not null)
+            await _grid.Reload();
+    }
+
+
+    private async Task Save()
+    {
+        _error = null;
+        _isSaving = true;
+
+        try
+        {
+            _model.CustomerName = (_model.CustomerName ?? "").Trim();
+
+            var created = await PurchasesApi.CreateAsync(_model);
+
+            // Cierra el modal devolviendo el Id creado
+            DialogService.Close(created.Id);
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+
+    private class DraftLine
+    {
+        public int Quantity { get; set; } = 1;
+        public string? Description { get; set; }
+    }
+
+    private class UiLine
+    {
+        public int ProductId { get; set; }
+        public string ProductName { get; set; } = "";
+        public decimal UnitPrice { get; set; }
+        public int Quantity { get; set; }
+        public string? Description { get; set; }
+        public decimal LineTotal => UnitPrice * Quantity;
+    }
+
+    private void OnSelectedProductChanged(ProductSearchDto? value)
+    {
+        _selectedProduct = value;
+    }
+
+    private void OnProductTextChanged(object? value)
+    {
+        _productText = value?.ToString() ?? "";
+
+        _selectedProduct = _productSuggestions
+        .FirstOrDefault(p => string.Equals(p.Name, _productText, StringComparison.OrdinalIgnoreCase));
+    }
+
+
+
+}

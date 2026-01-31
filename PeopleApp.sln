@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 18
+VisualStudioVersion = 18.2.11415.280
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PeopleApp.Api", "PeopleApp.Api\PeopleApp.Api.csproj", "{A257CF80-D127-6C5C-8639-B0EDFA2A5732}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PeopleApp.Client", "PeopleApp.Client\PeopleApp.Client.csproj", "{A10B2567-F6EA-C280-A13C-B5D9531F0FEC}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{A257CF80-D127-6C5C-8639-B0EDFA2A5732}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A257CF80-D127-6C5C-8639-B0EDFA2A5732}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A257CF80-D127-6C5C-8639-B0EDFA2A5732}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A257CF80-D127-6C5C-8639-B0EDFA2A5732}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A10B2567-F6EA-C280-A13C-B5D9531F0FEC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A10B2567-F6EA-C280-A13C-B5D9531F0FEC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A10B2567-F6EA-C280-A13C-B5D9531F0FEC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A10B2567-F6EA-C280-A13C-B5D9531F0FEC}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {053D4601-12AA-4BE7-A5F6-D32F7270D6D8}
+	EndGlobalSection
+EndGlobal

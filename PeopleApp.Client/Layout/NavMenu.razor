@@ -1,0 +1,92 @@
+﻿@using Microsoft.AspNetCore.Components.Authorization
+@using PeopleApp.Client.Services.Auth
+@using Radzen.Blazor
+@using Microsoft.JSInterop
+@inject AuthService AuthService
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+
+<input type="checkbox" id="sidebarCollapse" class="sidebar-collapse-toggle" @onchange="OnCollapseChanged" />
+
+<div class="top-row navbar navbar-dark">
+    <div class="container-fluid">
+        <a class="navbar-brand" href="">
+            <span class="brand-full">PeopleApp.Client</span>
+            <span class="brand-collapsed">PC</span>
+        </a>
+    </div>
+</div>
+
+<div class="@NavMenuCssClass nav-scrollable" @onclick="ToggleNavMenu">
+    <RadzenPanelMenu Style="width:100%; border:none;">
+        <RadzenPanelMenuItem Text="Home" Icon="home" Path="" />
+        <RadzenPanelMenuItem Text="Counter" Icon="add_box" Path="counter" />
+        <RadzenPanelMenuItem Text="Catalogo" Icon="list_alt" Path="all-people" />
+        <RadzenPanelMenuItem Text="Compras" Icon="shopping_cart" Path="purchases" />
+        <RadzenPanelMenuItem Text="Dashboard" Icon="dashboard" Path="dashboard" />
+        <RadzenPanelMenuItem Text="Reports" Icon="bar_chart">
+            <RadzenPanelMenuItem Text="Purchases" Icon="show_chart" Path="reports/purchases" />
+            <RadzenPanelMenuItem Text="Daily Sales" Icon="today" Path="reports/daily-sales" />
+        </RadzenPanelMenuItem>
+        <AuthorizeView>
+            <Authorized>
+                <RadzenPanelMenuItem Text="Mi Perfil" Icon="person" Path="me" />
+                <RadzenPanelMenuItem Text="Cerrar Sesión" Icon="logout" Click="@(_ => HandleLogout())" />
+            </Authorized>
+            <NotAuthorized>
+                <RadzenPanelMenuItem Text="Login" Icon="login" Path="login" />
+            </NotAuthorized>
+        </AuthorizeView>
+    </RadzenPanelMenu>
+</div>
+
+@code {
+    private bool collapseNavMenu = true;
+    private bool isCollapsed = false;
+    private string? NavMenuCssClass => collapseNavMenu ? "collapse" : null;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await Task.Delay(100); // Esperar a que Radzen renderice
+            await UpdateTextVisibility();
+        }
+    }
+
+    private async Task ToggleSidebar()
+    {
+        isCollapsed = !isCollapsed;
+        await JS.InvokeVoidAsync("eval", $"document.getElementById('sidebarCollapse').checked = {isCollapsed.ToString().ToLower()};");
+        await UpdateTextVisibility();
+    }
+
+    private async Task OnCollapseChanged(ChangeEventArgs e)
+    {
+        isCollapsed = (bool)(e.Value ?? false);
+        await UpdateTextVisibility();
+    }
+
+    private async Task UpdateTextVisibility()
+    {
+        var script = @"
+            const texts = document.querySelectorAll('.rz-panel-menu-item-text');
+            const isCollapsed = " + isCollapsed.ToString().ToLower() + @";
+            texts.forEach(text => {
+                text.style.display = isCollapsed ? 'none' : '';
+            });
+        ";
+        await JS.InvokeVoidAsync("eval", script);
+    }
+
+    private void ToggleNavMenu()
+    {
+        collapseNavMenu = !collapseNavMenu;
+    }
+
+    private async Task HandleLogout()
+    {
+        await AuthService.LogoutAsync();
+        Navigation.NavigateTo("/", forceLoad: true);
+    }
+}

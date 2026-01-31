@@ -1,0 +1,86 @@
+﻿@page "/login-2fa"
+@layout PeopleApp.Client.Layout.AuthLayout
+@using PeopleApp.Client.Dtos
+@using Radzen
+@using Radzen.Blazor
+@inject PeopleApp.Client.Services.Auth.AuthService AuthService
+@inject NavigationManager Nav
+
+<div class="auth-avatar" style="background: linear-gradient(135deg, #2196F3 0%, #42A5F5 100%); width: 80px; height: 80px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.5rem;">
+    <RadzenIcon Icon="lock" Style="font-size:40px; color:#fff;" />
+</div>
+
+<h3 class="auth-title" style="color: #2196F3; font-weight: 600; margin-bottom: 1rem;">Verificación de seguridad</h3>
+<p style="text-align: center; color: #666; margin-bottom: 2rem; font-size: 14px;">
+    Hemos enviado un código de seguridad a <strong>@email</strong>
+</p>
+
+<RadzenTemplateForm TItem="LoginWith2FARequestDto" Data="@model" Submit="@HandleVerify">
+    <RadzenStack Gap="1.2rem">
+        <RadzenStack Orientation="Orientation.Vertical" Gap="0.5rem">
+            <RadzenLabel Component="CodeInput" Style="font-weight: 500; color: #333;">
+                Código de verificación
+            </RadzenLabel>
+            <RadzenTextBox Name="CodeInput" @bind-Value="model.Code" Placeholder="A1B2C3"
+                           Style="width:100%; height: 48px; border-radius: 8px; border: 2px solid #BBDEFB; background-color: white; text-align: center; font-size: 20px; letter-spacing: 4px; text-transform: uppercase;"
+                           MaxLength="6" />
+            <RadzenRequiredValidator Component="CodeInput" Text="Código es requerido" />
+            <RadzenLengthValidator Component="CodeInput" Min="6" Text="El código debe tener 6 caracteres" />
+        </RadzenStack>
+
+        @if (!string.IsNullOrWhiteSpace(errorMessage))
+        {
+            <RadzenAlert Severity="AlertSeverity.Error" Text="@errorMessage"
+                         Style="border-radius: 8px;" />
+        }
+
+        <RadzenButton Text="Verificar y entrar" ButtonType="ButtonType.Submit"
+                      Style="width:100%; height:52px; background: linear-gradient(135deg, #2196F3 0%, #42A5F5 100%); border-radius: 8px; font-weight: 600; font-size: 16px; border: none;"
+                      ButtonStyle="ButtonStyle.Info"
+                      Disabled="@isBusy" />
+
+        <div style="text-align:center; margin-top:12px;">
+            <a href="/login" style="color: #2196F3; font-weight: 600; text-decoration: none;">← Volver al login</a>
+        </div>
+    </RadzenStack>
+</RadzenTemplateForm>
+
+@code {
+    [SupplyParameterFromQuery]
+    public string? email { get; set; }
+
+    private LoginWith2FARequestDto model = new();
+    private string errorMessage = "";
+    private bool isBusy = false;
+
+    protected override void OnInitialized()
+    {
+        if (string.IsNullOrWhiteSpace(email))
+        {
+            Nav.NavigateTo("/login");
+            return;
+        }
+
+        model.Email = email;
+    }
+
+    private async Task HandleVerify(LoginWith2FARequestDto model)
+    {
+        try
+        {
+            isBusy = true;
+            errorMessage = "";
+
+            await AuthService.LoginWith2FAAsync(model);
+            Nav.NavigateTo("/me", replace: true);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            isBusy = false;
+        }
+    }
+}

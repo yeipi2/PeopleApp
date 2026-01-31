@@ -1,0 +1,77 @@
+﻿@using PeopleApp.Client.Dtos
+@using Radzen
+@using Radzen.Blazor
+@inject PeopleApp.Client.Services.Auth.AuthService AuthService
+@inject DialogService DialogService
+@inject NotificationService NotificationService
+
+<RadzenTemplateForm TItem="UpdatePhoneDto" Data="@model" Submit="@HandleSubmit">
+    <RadzenStack Gap="1rem">
+        <RadzenText TextStyle="TextStyle.Body1" Style="color: #666;">
+            Actualiza tu número de teléfono
+        </RadzenText>
+
+        <RadzenStack Orientation="Orientation.Vertical" Gap="0.5rem">
+            <RadzenLabel Component="PhoneInput" Style="font-weight: 500;">
+                Nuevo Número de Teléfono
+            </RadzenLabel>
+            <RadzenTextBox Name="PhoneInput" @bind-Value="model.PhoneNumber"
+                           Placeholder="10 dígitos"
+                           Style="width:100%; height: 48px;"
+                           InputAttributes="@(new Dictionary<string, object>
+                           {
+                               ["inputmode"] = "numeric",
+                               ["pattern"] = "[0-9]*",
+                               ["maxlength"] = "15"
+                           })" />
+            <RadzenRequiredValidator Component="PhoneInput" Text="Teléfono es requerido" />
+            <RadzenLengthValidator Component="PhoneInput" Min="10" Text="Mínimo 10 dígitos" />
+        </RadzenStack>
+
+        @if (!string.IsNullOrWhiteSpace(errorMessage))
+        {
+            <RadzenAlert Severity="AlertSeverity.Error" Text="@errorMessage" />
+        }
+
+        <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" JustifyContent="JustifyContent.End">
+            <RadzenButton Text="Cancelar" Click="@(() => DialogService.Close(false))"
+                          ButtonStyle="ButtonStyle.Light" />
+            <RadzenButton Text="Guardar" ButtonType="ButtonType.Submit"
+                          ButtonStyle="ButtonStyle.Primary"
+                          Disabled="@isBusy" />
+        </RadzenStack>
+    </RadzenStack>
+</RadzenTemplateForm>
+
+@code {
+    [Parameter] public string CurrentPhone { get; set; } = "";
+
+    private UpdatePhoneDto model = new();
+    private string errorMessage = "";
+    private bool isBusy = false;
+
+    protected override void OnInitialized()
+    {
+        model.PhoneNumber = CurrentPhone;
+    }
+
+    private async Task HandleSubmit(UpdatePhoneDto model)
+    {
+        try
+        {
+            isBusy = true;
+            errorMessage = "";
+
+            await AuthService.UpdatePhoneAsync(model);
+            DialogService.Close(true);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            isBusy = false;
+        }
+    }
+}

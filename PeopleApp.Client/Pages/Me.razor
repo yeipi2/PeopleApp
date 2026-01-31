@@ -1,0 +1,311 @@
+@page "/me"
+@using PeopleApp.Client.Dtos
+@using Radzen
+@using Radzen.Blazor
+@using Microsoft.AspNetCore.Authorization
+@inject PeopleApp.Client.Services.Auth.AuthService AuthService
+@inject NavigationManager Nav
+@inject DialogService DialogService
+@inject NotificationService NotificationService
+@attribute [Authorize]
+
+<PageTitle>Mi Perfil</PageTitle>
+
+<style>
+    .profile-container {
+        max-width: 900px;
+        margin: 0 auto;
+        padding: 24px;
+    }
+
+    .profile-header {
+        background: linear-gradient(135deg, #ff6b35 0%, #ff8c42 100%);
+        border-radius: 16px;
+        padding: 32px;
+        color: white;
+        margin-bottom: 24px;
+        box-shadow: 0 8px 24px rgba(255, 107, 53, 0.2);
+    }
+
+    .profile-avatar {
+        width: 80px;
+        height: 80px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.2);
+        backdrop-filter: blur(10px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: 3px solid rgba(255, 255, 255, 0.3);
+    }
+
+    .section-card {
+        background: white;
+        border-radius: 12px;
+        padding: 24px;
+        margin-bottom: 16px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        transition: all 0.3s ease;
+    }
+
+        .section-card:hover {
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+        }
+
+    .section-title {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 16px;
+        font-size: 18px;
+        font-weight: 600;
+        color: #333;
+    }
+
+    .info-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 12px 0;
+        border-bottom: 1px solid #f0f0f0;
+    }
+
+        .info-row:last-child {
+            border-bottom: none;
+        }
+
+    .info-label {
+        color: #666;
+        font-size: 14px;
+        font-weight: 500;
+    }
+
+    .info-value {
+        color: #333;
+        font-size: 14px;
+    }
+
+    .edit-button {
+        background: none;
+        border: none;
+        color: #ff6b35;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 600;
+        padding: 4px 12px;
+        border-radius: 6px;
+        transition: all 0.2s;
+    }
+
+        .edit-button:hover {
+            background: #fff5f0;
+        }
+</style>
+
+<div class="profile-container">
+    <!-- Header con Avatar -->
+    <div class="profile-header">
+        <div style="display: flex; align-items: center; gap: 24px;">
+            <div class="profile-avatar">
+                <RadzenIcon Icon="person" Style="font-size: 40px; color: white;" />
+            </div>
+            <div style="flex: 1;">
+                <h1 style="margin: 0 0 8px 0; font-size: 28px;">@user?.FirstName @user?.LastName</h1>
+                <p style="margin: 0; opacity: 0.9; font-size: 16px;">@user?.Email</p>
+            </div>
+            <RadzenButton Text="Cerrar sesión"
+                          Click="@HandleLogout"
+                          ButtonStyle="ButtonStyle.Light"
+                          Icon="logout"
+                          Style="background: rgba(255,255,255,0.2); color: white; border: none;" />
+        </div>
+    </div>
+
+    <!-- Seguridad -->
+    <div class="section-card">
+        <div class="section-title">
+            <RadzenIcon Icon="security" Style="color: #2196F3;" />
+            Seguridad
+        </div>
+
+        <!-- 2FA Toggle -->
+        <div class="info-row">
+            <div>
+                <div class="info-label">Autenticación de Dos Factores</div>
+                <div style="font-size: 12px; color: #999; margin-top: 4px;">
+                    @(twoFactorEnabled ? "Código requerido al iniciar sesión" : "Tu cuenta es menos segura")
+                </div>
+            </div>
+            <RadzenSwitch @bind-Value="@twoFactorEnabled" Change="@OnToggle2FA" />
+        </div>
+
+        <!-- Cambiar Contraseña -->
+        <div class="info-row">
+            <div>
+                <div class="info-label">Contraseña</div>
+                <div style="font-size: 12px; color: #999; margin-top: 4px;">••••••••</div>
+            </div>
+            <button class="edit-button" @onclick="OpenChangePasswordDialog">
+                Cambiar
+            </button>
+        </div>
+    </div>
+
+    <!-- Información de Contacto -->
+    <div class="section-card">
+        <div class="section-title">
+            <RadzenIcon Icon="contact_phone" Style="color: #4CAF50;" />
+            Información de Contacto
+        </div>
+
+        <div class="info-row">
+            <div>
+                <div class="info-label">Email</div>
+                <div class="info-value">@user?.Email</div>
+            </div>
+        </div>
+
+        <div class="info-row">
+            <div>
+                <div class="info-label">Teléfono</div>
+                <div class="info-value">
+                    @(string.IsNullOrWhiteSpace(user?.PhoneNumber) ? "No registrado" : user.PhoneNumber)
+                </div>
+            </div>
+            <button class="edit-button" @onclick="OpenEditPhoneDialog">
+                Editar
+            </button>
+        </div>
+    </div>
+</div>
+
+@code {
+    private UserMeDto? user;
+    private bool twoFactorEnabled = false;
+    private bool isLoading = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadUserData();
+    }
+
+    private async Task LoadUserData()
+    {
+        try
+        {
+            user = await AuthService.GetUserAsync();
+            twoFactorEnabled = user.TwoFactorEmailEnabled;
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Error,
+                Summary = "Error",
+                Detail = $"No se pudo cargar la información: {ex.Message}",
+                Duration = 4000
+            });
+        }
+    }
+
+    private async Task OnToggle2FA(bool newValue)
+    {
+        if (isLoading) return;
+
+        if (newValue)
+        {
+            var confirmed = await DialogService.Confirm(
+                "Al activar 2FA, recibirás un código en tu correo cada vez que inicies sesión. ¿Continuar?",
+                "Activar Autenticación de Dos Factores",
+                new ConfirmOptions { OkButtonText = "Activar", CancelButtonText = "Cancelar" }
+            );
+
+            if (confirmed != true)
+            {
+                twoFactorEnabled = false;
+                return;
+            }
+        }
+        else
+        {
+            var confirmed = await DialogService.Confirm(
+                "Desactivar 2FA hará tu cuenta menos segura. ¿Estás seguro?",
+                "Desactivar Autenticación de Dos Factores",
+                new ConfirmOptions { OkButtonText = "Desactivar", CancelButtonText = "Cancelar" }
+            );
+
+            if (confirmed != true)
+            {
+                twoFactorEnabled = true;
+                return;
+            }
+        }
+
+        try
+        {
+            isLoading = true;
+            await AuthService.Toggle2FAAsync(newValue);
+
+            NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Success,
+                Summary = "Éxito",
+                Detail = newValue ? "2FA activado" : "2FA desactivado",
+                Duration = 3000
+            });
+
+            await LoadUserData();
+        }
+        catch (Exception ex)
+        {
+            twoFactorEnabled = !newValue;
+            NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Error,
+                Summary = "Error",
+                Detail = ex.Message,
+                Duration = 4000
+            });
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task OpenEditPhoneDialog()
+    {
+        var result = await DialogService.OpenAsync<EditPhoneDialog>("Editar Teléfono",
+            new Dictionary<string, object> { { "CurrentPhone", user?.PhoneNumber ?? "" } },
+            new DialogOptions { Width = "500px" });
+
+        if (result is bool success && success)
+        {
+            await LoadUserData();
+        }
+    }
+
+    private async Task OpenChangePasswordDialog()
+    {
+        var result = await DialogService.OpenAsync<ChangePasswordDialog>("Cambiar Contraseña",
+            null,
+            new DialogOptions { Width = "550px" });
+
+        if (result is bool success && success)
+        {
+            NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Success,
+                Summary = "Contraseña actualizada",
+                Detail = "Tu contraseña se ha cambiado exitosamente",
+                Duration = 3000
+            });
+        }
+    }
+
+    private async Task HandleLogout()
+    {
+        await AuthService.LogoutAsync();
+        Nav.NavigateTo("/login", replace: true);
+    }
+}

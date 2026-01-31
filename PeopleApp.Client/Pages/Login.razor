@@ -1,0 +1,182 @@
+@page "/login"
+@layout PeopleApp.Client.Layout.AuthLayout
+@using PeopleApp.Client.Dtos
+@using Radzen
+@using Radzen.Blazor
+@using Microsoft.JSInterop
+@inject PeopleApp.Client.Services.Auth.AuthService AuthService
+@inject NavigationManager Nav
+@inject AuthenticationStateProvider AuthStateProvider
+@inject IJSRuntime JS
+@implements IDisposable
+
+<div class="auth-avatar" style="background: linear-gradient(135deg, #ff6b35 0%, #ff8c42 100%); width: 80px; height: 80px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.5rem;">
+    <RadzenIcon Icon="login" Style="font-size:40px; color:#fff;" />
+</div>
+
+<h3 class="auth-title" style="color: #ff6b35; font-weight: 600; margin-bottom: 1.8rem;">Bienvenido de nuevo</h3>
+
+<RadzenTemplateForm TItem="LoginRequestDto" Data="@model" Submit="@HandleLogin">
+    <RadzenStack Gap="1.2rem">
+        <RadzenStack Orientation="Orientation.Vertical" Gap="0.5rem">
+            <RadzenLabel Component="EmailInput" Style="font-weight: 500; color: #333;">
+                Email
+            </RadzenLabel>
+            <RadzenTextBox Name="EmailInput" @bind-Value="model.Email" Placeholder="tu@email.com"
+                           Style="width:100%; height: 48px; border-radius: 8px; border: 2px solid #ffd4b8; background-color: white;" />
+            <RadzenRequiredValidator Component="EmailInput" Text="Email es requerido" />
+            <RadzenEmailValidator Component="EmailInput" Text="Ingresa un email válido" />
+        </RadzenStack>
+
+        <RadzenStack Orientation="Orientation.Vertical" Gap="0.5rem">
+            <RadzenLabel Component="PasswordInput" Style="font-weight: 500; color: #333;">
+                Contraseña
+            </RadzenLabel>
+            <RadzenPassword Name="PasswordInput" @bind-Value="model.Password" Placeholder="••••••••"
+                            Style="width:100%; height: 48px; border-radius: 8px; border: 2px solid #ffd4b8; background-color: white;" />
+            <RadzenRequiredValidator Component="PasswordInput" Text="Contraseña es requerida" />
+            <RadzenLengthValidator Component="PasswordInput" Min="8"
+                                   Text="La contraseña debe tener mínimo 8 caracteres" />
+        </RadzenStack>
+
+        @if (!string.IsNullOrWhiteSpace(errorMessage))
+        {
+            <RadzenAlert Severity="AlertSeverity.Error" Text="@errorMessage"
+                         Style="border-radius: 8px;" />
+        }
+
+        <RadzenButton Text="Iniciar sesión" ButtonType="ButtonType.Submit"
+                      Style="width:100%; height:52px; background: linear-gradient(135deg, #ff6b35 0%, #ff8c42 100%); border-radius: 8px; font-weight: 600; font-size: 16px; border: none; box-shadow: 0 4px 12px rgba(255, 107, 53, 0.3);"
+                      ButtonStyle="ButtonStyle.Primary"
+                      Disabled="@isBusy" />
+
+        <!-- Separador "o" -->
+        <div style="display: flex; align-items: center; margin: 8px 0;">
+            <div style="flex: 1; height: 1px; background-color: #ddd;"></div>
+            <span style="padding: 0 16px; color: #999; font-size: 14px;">o</span>
+            <div style="flex: 1; height: 1px; background-color: #ddd;"></div>
+        </div>
+
+        <!-- Contenedor para el botón de Google -->
+        <div id="google-signin-button" style="width: 100%;"></div>
+
+        <div style="text-align:center; margin-top:12px; color: #666;">
+            <span>¿No tienes cuenta?</span>
+            <a href="/register" style="color: #ff6b35; font-weight: 600; text-decoration: none; margin-left: 4px;">Regístrate aquí</a>
+        </div>
+    </RadzenStack>
+</RadzenTemplateForm>
+
+@code {
+    private LoginRequestDto model = new();
+    private string errorMessage = "";
+    private bool isBusy = false;
+    private DotNetObjectReference<Login>? dotNetHelper;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var state = await AuthStateProvider.GetAuthenticationStateAsync();
+        if (state.User.Identity?.IsAuthenticated == true)
+            Nav.NavigateTo("/me", replace: true);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                dotNetHelper = DotNetObjectReference.Create(this);
+                var clientId = "412343968882-md2qcofqt3silc4ojnrevp2ienmhai70.apps.googleusercontent.com";
+
+                await JS.InvokeVoidAsync("googleAuth.initialize", clientId, dotNetHelper);
+                await Task.Delay(100); // Pequeño delay para asegurar que el elemento existe
+                await JS.InvokeVoidAsync("googleAuth.renderButton", "google-signin-button");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error initializing Google Sign-In: {ex.Message}");
+            }
+        }
+    }
+
+    [JSInvokable]
+    public async Task HandleGoogleResponse(string credential)
+    {
+        try
+        {
+            isBusy = true;
+            errorMessage = "";
+
+            Console.WriteLine("[Login.HandleGoogleResponse] Starting Google login...");
+
+            var result = await AuthService.GoogleLoginAsync(credential);
+
+            Console.WriteLine($"[Login.HandleGoogleResponse] Result - Requires2FA: {result.Requires2FA}, Email: {result.Email}");
+
+            if (result.Requires2FA)
+            {
+                if (!string.IsNullOrWhiteSpace(result.Email))
+                {
+                    Console.WriteLine($"[Login] Redirecting to 2FA page with email: {result.Email}");
+                    Nav.NavigateTo($"/login-2fa?email={Uri.EscapeDataString(result.Email)}", replace: true);
+                }
+                else
+                {
+                    Console.WriteLine("[Login] ERROR: Email is null or empty");
+                    errorMessage = "Error: no se pudo obtener el email del usuario.";
+                }
+                return;
+            }
+
+            Console.WriteLine("[Login] Redirecting to /me (no 2FA required)");
+            Nav.NavigateTo("/me", replace: true);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Login] Exception: {ex.Message}");
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            isBusy = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private async Task HandleLogin(LoginRequestDto model)
+    {
+        try
+        {
+            isBusy = true;
+            errorMessage = "";
+
+            // ✅ Llamar al método actualizado
+            var result = await AuthService.LoginWithPossible2FAAsync(model);
+
+            // ✅ Verificar si requiere 2FA
+            if (result.Requires2FA)
+            {
+                // Redirigir a página de 2FA
+                Nav.NavigateTo($"/login-2fa?email={Uri.EscapeDataString(model.Email)}", replace: true);
+                return;
+            }
+
+            // Login exitoso sin 2FA
+            Nav.NavigateTo("/me", replace: true);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            isBusy = false;
+        }
+    }
+
+    public void Dispose()
+    {
+        dotNetHelper?.Dispose();
+    }
+}
