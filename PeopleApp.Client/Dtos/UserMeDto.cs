@@ -8,4 +8,5 @@ public class UserMeDto
     public string LastName { get; set; } = string.Empty;
     public string PhoneNumber { get; set; } = string.Empty;
     public bool TwoFactorEmailEnabled { get; set; }
+    public bool HasPassword { get; set; }
 }

@@ -196,6 +196,11 @@ public class AuthService
         await _authApiClient.UpdatePhoneAsync(dto);
     }
 
+    public async Task SetPasswordAsync(SetPasswordDto dto)
+    {
+        await _authApiClient.SetPasswordAsync(dto);
+    }
+
 }
 
 // ✅ CLASE ACTUALIZADA

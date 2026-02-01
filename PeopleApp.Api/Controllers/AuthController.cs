@@ -259,7 +259,8 @@ public class AuthController : ControllerBase
             FirstName = user.FirstName,
             LastName = user.LastName,
             PhoneNumber = user.PhoneNumber ?? "",
-            TwoFactorEmailEnabled = user.TwoFactorEmailEnabled
+            TwoFactorEmailEnabled = user.TwoFactorEmailEnabled,
+            HasPassword = !string.IsNullOrEmpty(user.PasswordHash)
         });
     }
 
@@ -502,6 +503,37 @@ public class AuthController : ControllerBase
             return BadRequest(result.Errors.Select(e => e.Description));
 
         return Ok(new { message = "Teléfono actualizado exitosamente." });
+    }
+
+    /// <summary>
+    /// Crear contraseña para usuarios que se registraron solo con Google
+    /// POST: /api/auth/set-password
+    /// </summary>
+    [HttpPost("set-password")]
+    [Authorize]
+    public async Task<IActionResult> SetPassword([FromBody] SetPasswordDto dto)
+    {
+        var user = await _userManager.GetUserAsync(User);
+        if (user == null)
+            return Unauthorized("No se pudo identificar al usuario.");
+
+        // ✅ Solo permitir si NO tiene contraseña actualmente
+        if (!string.IsNullOrEmpty(user.PasswordHash))
+            return BadRequest("Tu cuenta ya tiene contraseña. Usa 'Cambiar contraseña' en su lugar.");
+
+        // Asignar la nueva contraseña directamente
+        user.PasswordHash = _userManager.PasswordHasher.HashPassword(user, dto.NewPassword);
+        var result = await _userManager.UpdateAsync(user);
+
+        if (!result.Succeeded)
+        {
+            _logger.LogError("Error al establecer contraseña: {Errors}",
+                string.Join(", ", result.Errors.Select(e => e.Description)));
+            return BadRequest("No se pudo establecer la contraseña.");
+        }
+
+        _logger.LogInformation("Contraseña establecida para usuario {Email} (previo solo Google)", user.Email);
+        return Ok(new { message = "Contraseña creada exitosamente." });
     }
 
 }

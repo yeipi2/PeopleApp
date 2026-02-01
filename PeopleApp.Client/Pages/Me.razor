@@ -138,20 +138,41 @@
             </div>
             <RadzenSwitch @bind-Value="@twoFactorEnabled" Change="@OnToggle2FA" />
         </div>
-
-        <!-- Cambiar Contraseña -->
+        <!-- Contraseña: muestra diferente opción según si la tiene o no -->
         <div class="info-row">
             <div>
                 <div class="info-label">Contraseña</div>
-                <div style="font-size: 12px; color: #999; margin-top: 4px;">••••••••</div>
+                <div style="font-size: 12px; color: #999; margin-top: 4px;">
+                    @if (user?.HasPassword == true)
+                    {
+                        <span>••••••••</span>
+                    }
+                    else
+                    {
+                        <span style="color: #ff9800;">No establecida (cuenta Google)</span>
+                    }
+                </div>
             </div>
-            <button class="edit-button" @onclick="OpenChangePasswordDialog">
-                Cambiar
-            </button>
+            @if (user?.HasPassword == true)
+            {
+                <button class="edit-button" @onclick="OpenChangePasswordDialog">
+                    Cambiar
+                </button>
+            }
+            else
+            {
+                <button class="edit-button" style="color: #4CAF50;" @onclick="OpenSetPasswordDialog">
+                    Crear
+                </button>
+            }
         </div>
     </div>
 
     <!-- Información de Contacto -->
+
+
+
+        <!-- Información de Contacto -->
     <div class="section-card">
         <div class="section-title">
             <RadzenIcon Icon="contact_phone" Style="color: #4CAF50;" />
@@ -303,9 +324,32 @@
         }
     }
 
+    private async Task OpenSetPasswordDialog()
+    {
+        var result = await DialogService.OpenAsync<SetPasswordDialog>("Crear Contraseña",
+        null,
+        new DialogOptions { Width = "500px" });
+
+        if (result is bool success && success)
+        {
+            NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Success,
+                Summary = "Contraseña creada",
+                Detail = "Ya puedes ingresar con tu email y contraseña",
+                Duration = 3000
+            });
+
+            // Recargar datos para actualizar HasPassword
+            await LoadUserData();
+        }
+    }
+
     private async Task HandleLogout()
     {
         await AuthService.LogoutAsync();
         Nav.NavigateTo("/login", replace: true);
     }
 }
+
+

@@ -3,6 +3,7 @@ using System.Text.Json;
 using PeopleApp.Client.Dtos;
 using PeopleApp.Client.Services.Http;
 
+
 namespace PeopleApp.Client.Services.Auth;
 
 public class AuthApiClient
@@ -246,6 +247,16 @@ public class AuthApiClient
     public async Task UpdatePhoneAsync(UpdatePhoneDto dto)
     {
         var response = await _httpClient.PostAsJsonAsync("api/auth/update-phone", dto);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var msg = await ApiErrorParser.ToUserMessageAsync(response);
+            throw new HttpRequestException(msg);
+        }
+    }
+    public async Task SetPasswordAsync(SetPasswordDto dto)
+    {
+        var response = await _httpClient.PostAsJsonAsync("api/auth/set-password", dto);
 
         if (!response.IsSuccessStatusCode)
         {
